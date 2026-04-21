@@ -14,25 +14,50 @@ Hierarquia de identificação (do mais específico para o mais geral):
 import time
 from datetime import datetime
 
-from scapy.all import (
-    Ether, ARP,
-    IP, IPv6,
-    ICMP,
-    TCP, UDP,
-    DNS, DNSQR, DNSRR,
-    DHCP, BOOTP,
-    Raw,
-)
+# Patch de compatibilidade — deve vir ANTES de qualquer import do Scapy
+import compat  # noqa: F401
 
-# ICMPv6 — importação tolerante (alguns ambientes podem não ter todos os tipos)
+# Importações específicas por módulo
+from scapy.layers.l2   import Ether, ARP
+from scapy.layers.inet import IP, ICMP, TCP, UDP
+from scapy.packet      import Raw
+
+# IPv6 — importação tolerante (pode não estar disponível em todos os ambientes)
 try:
-    from scapy.all import (
+    from scapy.layers.inet6 import IPv6
+    _HAS_IPV6 = True
+except Exception:
+    _HAS_IPV6  = False
+    IPv6       = None
+
+# DNS — módulo separado
+try:
+    from scapy.layers.dns import DNS, DNSQR, DNSRR
+    _HAS_DNS = True
+except Exception:
+    _HAS_DNS = False
+    DNS = DNSQR = DNSRR = None
+
+# DHCP — módulo separado
+try:
+    from scapy.layers.dhcp import DHCP, BOOTP
+    _HAS_DHCP = True
+except Exception:
+    _HAS_DHCP = False
+    DHCP = BOOTP = None
+
+# ICMPv6 — importação tolerante
+_HAS_ICMPV6 = False
+ICMPv6EchoRequest = ICMPv6EchoReply = None
+ICMPv6ND_NS = ICMPv6ND_NA = ICMPv6ND_RA = ICMPv6ND_RS = None
+try:
+    from scapy.layers.inet6 import (
         ICMPv6EchoRequest, ICMPv6EchoReply,
         ICMPv6ND_NS, ICMPv6ND_NA, ICMPv6ND_RA, ICMPv6ND_RS,
     )
     _HAS_ICMPV6 = True
-except ImportError:
-    _HAS_ICMPV6 = False
+except Exception:
+    pass
 
 
 class PacketAnalyzer:
@@ -43,7 +68,7 @@ class PacketAnalyzer:
         result = {
             'raw':           packet,
             'interface':     interface,
-            'timestamp':     datetime.now().strftime('%d-%m-%Y %H:%M:%S.%f')[:-3],
+            'timestamp':     datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
             'relative_time': round(now - start_time, 6) if start_time else 0.0,
             'size':          len(packet),
             'protocol':      'Unknown',
@@ -301,11 +326,11 @@ class PacketAnalyzer:
         })
 
         if udp.dport == 53 or udp.sport == 53:
-            if packet.haslayer(DNS):
+            if _HAS_DNS and packet.haslayer(DNS):
                 return self._parse_dns(packet, r)
 
         if udp.dport in (67, 68) or udp.sport in (67, 68):
-            if packet.haslayer(DHCP):
+            if _HAS_DHCP and packet.haslayer(DHCP):
                 return self._parse_dhcp(packet, r)
 
         r['summary'] = (

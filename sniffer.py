@@ -8,6 +8,8 @@ import argparse
 import sys
 import os
 
+import compat  # noqa: F401 — patch Scapy antes de qualquer outro import
+
 def parse_args():
     parser = argparse.ArgumentParser(
         prog='sniffer.py',
@@ -76,7 +78,8 @@ Exemplos de uso:
 
 def list_interfaces():
     """Mostra interfaces disponíveis usando Scapy."""
-    from scapy.all import get_if_list, get_if_addr
+    from scapy.arch import get_if_list
+    from scapy.interfaces import get_if_addr
     print("\nInterfaces disponíveis:")
     print(f"  {'Interface':<20} {'IP'}")
     print(f"  {'-'*20} {'-'*15}")

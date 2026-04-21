@@ -4,7 +4,9 @@ Responsável por: iniciar a sniffagem, coordenar filtros, display e logging.
 """
 
 import time
-from scapy.all import sniff
+from scapy.sendrecv import sniff
+
+import compat  # noqa: F401 — patch IPv6 route6 antes de qualquer import Scapy
 
 from protocols.analyzer import PacketAnalyzer
 from filters import FilterEngine
@@ -24,9 +26,11 @@ class SnifferEngine:
         self.display       = display
         self.logger        = logger
         self.count         = count          # 0 = ilimitado
+
         self.packet_count  = 0
         self.start_time    = None
         self._running      = False
+
         self.analyzer      = PacketAnalyzer()
         self.filter_engine = FilterEngine(filter_config)
 
