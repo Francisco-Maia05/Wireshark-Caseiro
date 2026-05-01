@@ -19,13 +19,12 @@ class FilterEngine:
         # ── Protocolo ─────────────────────────────────────────────────────────
         if self.protocol:
             proto = parsed.get('protocol', '').lower()
-            # suporte a sub-protocolos: "tcp" aceita "http" (que corre sobre TCP)
             tcp_family  = {'http'}
-            udp_family  = {'dns', 'dhcp'}
+            udp_family  = {'dhcp'}
             if self.protocol == 'tcp'  and proto in tcp_family:
-                pass  # ok
+                pass 
             elif self.protocol == 'udp' and proto in udp_family:
-                pass  # ok
+                pass 
             elif self.protocol not in proto:
                 return False
 

@@ -4,39 +4,19 @@ Recebe um pacote Scapy e retorna um dicionário normalizado com:
   timestamp, interface, protocolo, MACs, IPs, portas, tamanho, resumo, detalhes.
 
 Hierarquia de identificação (do mais específico para o mais geral):
-  Ethernet → ARP / IPv4 / IPv6
+  Ethernet → ARP / IPv4
   IPv4     → ICMP / TCP / UDP
-  IPv6     → ICMPv6 / TCP / UDP
   TCP      → HTTP  (porta 80/8080)
-  UDP      → DNS (porta 53) / DHCP (portas 67-68)
+  UDP      → DHCP (portas 67-68)
 """
 
 import time
 from datetime import datetime
 
-# Patch de compatibilidade — deve vir ANTES de qualquer import do Scapy
-import compat  # noqa: F401
-
 # Importações específicas por módulo
 from scapy.layers.l2   import Ether, ARP
 from scapy.layers.inet import IP, ICMP, TCP, UDP
 from scapy.packet      import Raw
-
-# IPv6 — importação tolerante (pode não estar disponível em todos os ambientes)
-try:
-    from scapy.layers.inet6 import IPv6
-    _HAS_IPV6 = True
-except Exception:
-    _HAS_IPV6  = False
-    IPv6       = None
-
-# DNS — módulo separado
-try:
-    from scapy.layers.dns import DNS, DNSQR, DNSRR
-    _HAS_DNS = True
-except Exception:
-    _HAS_DNS = False
-    DNS = DNSQR = DNSRR = None
 
 # DHCP — módulo separado
 try:
@@ -45,19 +25,6 @@ try:
 except Exception:
     _HAS_DHCP = False
     DHCP = BOOTP = None
-
-# ICMPv6 — importação tolerante
-_HAS_ICMPV6 = False
-ICMPv6EchoRequest = ICMPv6EchoReply = None
-ICMPv6ND_NS = ICMPv6ND_NA = ICMPv6ND_RA = ICMPv6ND_RS = None
-try:
-    from scapy.layers.inet6 import (
-        ICMPv6EchoRequest, ICMPv6EchoReply,
-        ICMPv6ND_NS, ICMPv6ND_NA, ICMPv6ND_RA, ICMPv6ND_RS,
-    )
-    _HAS_ICMPV6 = True
-except Exception:
-    pass
 
 
 class PacketAnalyzer:
@@ -97,10 +64,6 @@ class PacketAnalyzer:
         if packet.haslayer(IP):
             return self._parse_ipv4(packet, result)
 
-        # ── IPv6 ──────────────────────────────────────────────────────────────
-        if packet.haslayer(IPv6):
-            return self._parse_ipv6(packet, result)
-
         # Pacote sem camada reconhecida — ainda assim retornamos os dados de Ethernet
         result['summary'] = f"Ethernet {result['src_mac']} → {result['dst_mac']}"
         return result
@@ -120,9 +83,9 @@ class PacketAnalyzer:
         r['dst_mac']  = arp.hwdst
 
         if op == 'request':
-            r['summary'] = f"ARP request: quem tem {arp.pdst}? → {arp.psrc}"
+            r['summary'] = f"ARP Request: MAC {arp.hwsrc} pergunta quem tem o IP {arp.pdst}"
         else:
-            r['summary'] = f"ARP reply: {arp.psrc} está em {arp.hwsrc}"
+            r['summary'] = f"ARP Reply: IP {arp.psrc} está no MAC {arp.hwsrc} (Destino: {arp.hwdst})"
 
         r['details'] = {
             'operação':    op,
@@ -144,7 +107,7 @@ class PacketAnalyzer:
         r['protocol'] = 'IPv4'
         r['details'] = {
             'ttl':   ip.ttl,
-            'id':    ip.id,
+            'ip_id':    ip.id,
             'flags': str(ip.flags),
             'tos':   ip.tos,
         }
@@ -157,61 +120,6 @@ class PacketAnalyzer:
             return self._parse_udp(packet, r)
 
         r['summary'] = f"IPv4 {ip.src} → {ip.dst}  proto={ip.proto}"
-        return r
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # IPv6
-    # ═══════════════════════════════════════════════════════════════════════════
-
-    def _parse_ipv6(self, packet, r: dict) -> dict:
-        ip6 = packet[IPv6]
-        r['src_ip']  = ip6.src
-        r['dst_ip']  = ip6.dst
-        r['protocol'] = 'IPv6'
-        r['details'] = {
-            'hop_limit': ip6.hlim,
-            'next_header': ip6.nh,
-        }
-
-        # ICMPv6
-        if _HAS_ICMPV6:
-            if packet.haslayer(ICMPv6EchoRequest):
-                pkt = packet[ICMPv6EchoRequest]
-                r['protocol'] = 'ICMPv6'
-                r['summary']  = f"ICMPv6 Echo Request {ip6.src} → {ip6.dst}  id={pkt.id} seq={pkt.seq}"
-                r['details'].update({'id': pkt.id, 'seq': pkt.seq})
-                return r
-            if packet.haslayer(ICMPv6EchoReply):
-                pkt = packet[ICMPv6EchoReply]
-                r['protocol'] = 'ICMPv6'
-                r['summary']  = f"ICMPv6 Echo Reply {ip6.src} → {ip6.dst}  id={pkt.id} seq={pkt.seq}"
-                r['details'].update({'id': pkt.id, 'seq': pkt.seq})
-                return r
-            if packet.haslayer(ICMPv6ND_NS):
-                ns = packet[ICMPv6ND_NS]
-                r['protocol'] = 'ICMPv6'
-                r['summary']  = f"ICMPv6 NDP Neighbor Solicitation → {ns.tgt}"
-                return r
-            if packet.haslayer(ICMPv6ND_NA):
-                na = packet[ICMPv6ND_NA]
-                r['protocol'] = 'ICMPv6'
-                r['summary']  = f"ICMPv6 NDP Neighbor Advertisement {na.tgt}"
-                return r
-            if packet.haslayer(ICMPv6ND_RA):
-                r['protocol'] = 'ICMPv6'
-                r['summary']  = f"ICMPv6 NDP Router Advertisement {ip6.src}"
-                return r
-            if packet.haslayer(ICMPv6ND_RS):
-                r['protocol'] = 'ICMPv6'
-                r['summary']  = f"ICMPv6 NDP Router Solicitation {ip6.src}"
-                return r
-
-        if packet.haslayer(TCP):
-            return self._parse_tcp(packet, r)
-        if packet.haslayer(UDP):
-            return self._parse_udp(packet, r)
-
-        r['summary'] = f"IPv6 {ip6.src} → {ip6.dst}"
         return r
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -247,8 +155,8 @@ class PacketAnalyzer:
         src, dst = r['src_ip'], r['dst_ip']
 
         if icmp.type in (0, 8):
-            r['details']['id']  = icmp.id
-            r['details']['seq'] = icmp.seq
+            r['details']['icmp_id']  = icmp.id
+            r['details']['icmp_seq'] = icmp.seq 
             r['summary'] = f"ICMP {type_str} {src} → {dst}  id={icmp.id} seq={icmp.seq}"
         elif icmp.type == 3:
             code_str = self.ICMP_UNREACH_CODES.get(icmp.code, f'code={icmp.code}')
@@ -294,7 +202,6 @@ class PacketAnalyzer:
         src, dst = r['src_ip'], r['dst_ip']
         base = f"TCP {src}:{tcp.sport} → {dst}:{tcp.dport} [{flags_str}]"
 
-        # Anotações de estado de ligação TCP (handshake / teardown)
         note = ''
         if 'S' in flags and 'A' not in flags:
             note = ' ← SYN (início de ligação)'
@@ -325,10 +232,6 @@ class PacketAnalyzer:
             'length':   udp.len,
         })
 
-        if udp.dport == 53 or udp.sport == 53:
-            if _HAS_DNS and packet.haslayer(DNS):
-                return self._parse_dns(packet, r)
-
         if udp.dport in (67, 68) or udp.sport in (67, 68):
             if _HAS_DHCP and packet.haslayer(DHCP):
                 return self._parse_dhcp(packet, r)
@@ -338,52 +241,6 @@ class PacketAnalyzer:
             f"  len={udp.len}"
         )
         return r
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # DNS
-    # ═══════════════════════════════════════════════════════════════════════════
-
-    DNS_QTYPES = {1: 'A', 28: 'AAAA', 5: 'CNAME', 15: 'MX', 2: 'NS', 16: 'TXT', 255: 'ANY'}
-
-    def _parse_dns(self, packet, r: dict) -> dict:
-        dns = packet[DNS]
-        r['protocol'] = 'DNS'
-
-        if dns.qr == 0:   # Query
-            qname  = ''
-            qtype  = ''
-            if dns.qd:
-                try:
-                    qname = dns.qd.qname.decode('utf-8', errors='replace').rstrip('.')
-                except Exception:
-                    qname = str(dns.qd.qname)
-                qtype = self.DNS_QTYPES.get(dns.qd.qtype, str(dns.qd.qtype))
-            r['summary'] = f"DNS Query [{qtype}] {qname}"
-            r['details'].update({'query': qname, 'qtype': qtype, 'id': dns.id})
-
-        else:              # Response
-            answers = self._dns_answers(dns)
-            r['summary'] = f"DNS Response → {', '.join(answers[:3])}"
-            if len(answers) > 3:
-                r['summary'] += f" (+{len(answers)-3} mais)"
-            r['details'].update({'answers': answers, 'id': dns.id, 'rcode': dns.rcode})
-
-        return r
-
-    @staticmethod
-    def _dns_answers(dns) -> list[str]:
-        answers = []
-        an = dns.an
-        while an and hasattr(an, 'rrname'):
-            try:
-                answers.append(str(an.rdata))
-            except Exception:
-                pass
-            if hasattr(an, 'payload') and isinstance(an.payload, type(dns.an)):
-                an = an.payload
-            else:
-                break
-        return answers
 
     # ═══════════════════════════════════════════════════════════════════════════
     # DHCP
@@ -415,7 +272,6 @@ class PacketAnalyzer:
                 r['summary'] = f"DHCP {type_str} → IP oferecido: {offered}"
             else:
                 r['summary'] = f"DHCP {type_str}"
-            # Extrair opções úteis
             for opt in dhcp.options:
                 if isinstance(opt, tuple):
                     if opt[0] == 'server_id':
@@ -451,7 +307,6 @@ class PacketAnalyzer:
 
     @staticmethod
     def _decode_tcp_flags(flags) -> list[str]:
-        """Converte flags TCP (Scapy FlagValue) para lista de strings."""
         mapping = [
             ('F', 'FIN'), ('S', 'SYN'), ('R', 'RST'), ('P', 'PSH'),
             ('A', 'ACK'), ('U', 'URG'), ('E', 'ECE'), ('C', 'CWR'),

@@ -14,18 +14,14 @@ except ImportError:
     _HAS_COLOR = False
 
 
-# Cor por protocolo
 PROTO_COLOR = {
     'ARP':     Fore.YELLOW,
     'ICMP':    Fore.CYAN,
-    'ICMPV6':  Fore.CYAN,
     'TCP':     Fore.GREEN,
     'UDP':     Fore.BLUE,
-    'DNS':     Fore.MAGENTA,
     'DHCP':    Fore.LIGHTYELLOW_EX,
     'HTTP':    Fore.LIGHTCYAN_EX,
     'IPV4':    Fore.WHITE,
-    'IPV6':    Fore.WHITE,
     'ETHERNET':Fore.WHITE,
 }
 
