@@ -1,8 +1,3 @@
-"""
-Motor de captura de pacotes usando Scapy.
-Responsável por: iniciar a sniffagem, coordenar filtros, display e logging.
-"""
-
 import time
 from scapy.sendrecv import sniff
 
@@ -33,17 +28,11 @@ class SnifferEngine:
         self.total_bytes    = 0
         self.protocol_stats = {}
 
-        # Guarda Pings Request (Chave: icmp_id_seq, Valor: index_do_pacote)
         self.icmp_requests = {}
-        
-        # Guarda Fragmentos IPv4 (Chave: ip_id, Valor: [lista_de_indices])
         self.ipv4_fragments = {}
-        # ──────────────────────────────────────────────────────────────────────
 
         self.analyzer      = PacketAnalyzer()
         self.filter_engine = FilterEngine(filter_config)
-
-    # ── API pública ───────────────────────────────────────────────────────────
 
     def start(self):
         self._running  = True
@@ -64,16 +53,27 @@ class SnifferEngine:
         self._running = False
         self.end_time = time.time()
 
-    # ── Processamento interno ─────────────────────────────────────────────────
-
     def _process_packet(self, packet):
         parsed = self.analyzer.analyze(packet, self.interface, self.start_time)
         if parsed is None:
             return
 
+        if packet.haslayer("IP"):
+            ip_layer = packet["IP"]
+            # Se tem a flag MF (More Fragments) ou é uma peça com offset > 0
+            if 'MF' in str(ip_layer.flags) or ip_layer.frag > 0:
+                if 'Fragmento' not in parsed.get('summary', ''):
+                    # Injeta a tag "Fragmento" e os IDs para o nosso filtro e memória os verem
+                    parsed['summary'] = f"IPv4 Fragmento (id={ip_layer.id} offset={ip_layer.frag}) " + parsed.get('summary', '')
+                
+                if 'details' not in parsed:
+                    parsed['details'] = {}
+                parsed['details']['ip_id'] = ip_layer.id
+
         if not self.filter_engine.matches(parsed):
             return
 
+        # --- FILTRO EXTRA: Apenas Fragmentados ---
         if self.filter_config.get('fragmented'):
             if 'Fragmento' not in parsed.get('summary', ''):
                 return
@@ -106,6 +106,7 @@ class SnifferEngine:
             if ip_id is not None:
                 if ip_id not in self.ipv4_fragments:
                     self.ipv4_fragments[ip_id] = []
+                
                 self.ipv4_fragments[ip_id].append(current_idx)
                 
                 num_frag = len(self.ipv4_fragments[ip_id])
@@ -127,7 +128,6 @@ class SnifferEngine:
         self.protocol_stats[proto]['pkts'] += 1
         self.protocol_stats[proto]['bytes'] += size
 
-        # Output Visual e Logging
         if self.display:
             self.display.print_packet(parsed)
 

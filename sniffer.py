@@ -1,3 +1,4 @@
+
 import argparse
 import sys
 import os
@@ -16,19 +17,21 @@ def parse_args():
         epilog="""
 Exemplos de uso:
   sudo python sniffer.py -i eth0
-  sudo python sniffer.py -i eth0 --protocol icmp
   sudo python sniffer.py -i eth0 --protocol tcp -v
-  sudo python sniffer.py -i eth0 --log captura.csv
-  sudo python sniffer.py -i eth0 -c 50
+  sudo python sniffer.py -i eth0 --port 80 --tcp-flags S
+  sudo python sniffer.py -i eth0 --fragmented
         """
     )
 
+    # Utilitários
     parser.add_argument('--list-interfaces', action='store_true',
                         help='Lista as interfaces de rede disponíveis e sai')
-    
+
+    # Interface
     parser.add_argument('-i', '--interface',
                         help='Interface de rede a escutar (ex.: eth0, wlan0)')
 
+    # ── Filtros ──────────────────────────────────────────────────────────────
     fg = parser.add_argument_group('Filtros')
     fg.add_argument('--protocol', metavar='PROTO',
                     help='Filtrar por protocolo: arp, icmp, tcp, udp, dhcp, http, ipv4')
@@ -41,7 +44,13 @@ Exemplos de uso:
     fg.add_argument('--mac', metavar='ADDR',
                     help='Filtrar por endereço MAC (src ou dst)')
     fg.add_argument('--bpf', metavar='EXPR',
-                    help='Expressão BPF passada diretamente ao Scapy (ex.: "port 80")')
+                    help='Expressão BPF passada diretamente ao Scapy (ex.: "port 80")') 
+    fg.add_argument('--port', type=int, metavar='PORTA',
+                    help='Filtrar por porta TCP/UDP (origem ou destino)')
+    fg.add_argument('--tcp-flags', metavar='FLAGS',
+                    help='Filtrar por flags TCP (ex: S, F, FA, SA)')
+    fg.add_argument('--fragmented', action='store_true',
+                    help='Filtrar apenas pacotes IPv4 fragmentados')
 
     # ── Output ────────────────────────────────────────────────────────────────
     og = parser.add_argument_group('Output')
@@ -100,13 +109,17 @@ def main():
     logger  = Logger(args.log, args.log_format) if args.log else None
     display = Display(verbose=args.verbose)     if not args.no_live else None
 
+    # Configuração de Filtros atualizada com as novas flags
     filter_config = {
-        'protocol': args.protocol.lower() if args.protocol else None,
-        'ip':       args.ip,
-        'mac':      args.mac,
-        'src_ip':   args.src_ip,
-        'dst_ip':   args.dst_ip,
-        'bpf':      args.bpf,
+        'protocol':   args.protocol.lower() if args.protocol else None,
+        'ip':         args.ip,
+        'mac':        args.mac,
+        'src_ip':     args.src_ip,
+        'dst_ip':     args.dst_ip,
+        'bpf':        args.bpf,
+        'port':       args.port,
+        'tcp_flags':  args.tcp_flags,
+        'fragmented': args.fragmented,
     }
 
     engine = SnifferEngine(
@@ -143,8 +156,10 @@ def main():
             print(f"  Início: {start_dt}  |  Duração: {duration:.2f}s  |  Total Pacotes: {engine.packet_count}")
             
             if engine.protocol_stats:
+                print(f"\n  Hierarchy Statistics (Taxas Médias & Totais):")
+                print(f"  {'Protocolo':<25} | {'Pacotes':<8} | {'% Pkts':<7} | {'Bytes':<10} | {'Tx (Pkts/s)':<11} | {'Tx (Bytes/s)'}")
+                print(f"  {'-'*25}-+-{'-'*8}-+-{'-'*7}-+-{'-'*10}-+-{'-'*11}-+-{'-'*15}")
 
-                # Definição das relações para construir a árvore
                 PATHS = {
                     'HTTP':     ['Ethernet', 'IPv4', 'TCP', 'HTTP'],
                     'DHCP':     ['Ethernet', 'IPv4', 'UDP', 'DHCP'],
@@ -167,13 +182,7 @@ def main():
                         current['pkts']  += stats['pkts']
                         current['bytes'] += stats['bytes']
 
-                print(f"\n  Hierarchy Statistics (Taxas Médias & Totais):")
-                print(f"  {'Protocolo':<25} | {'Pacotes':<8} | {'% Pkts':<7} | {'Bytes':<10} | {'Tx (Pkts/s)':<11} | {'Tx (Bytes/s)'}")
-                print(f"  {'-'*25}-+-{'-'*8}-+-{'-'*7}-+-{'-'*10}-+-{'-'*11}-+-{'-'*15}")
-
-
                 def format_bytes(b):
-                    
                     if b < 1024: return f"{b:.1f} B"
                     elif b < 1024**2: return f"{b/1024:.1f} KB"
                     else: return f"{b/(1024**2):.2f} MB"
