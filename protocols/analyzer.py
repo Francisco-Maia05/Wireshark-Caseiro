@@ -72,6 +72,10 @@ class PacketAnalyzer:
     # ARP
     # ═══════════════════════════════════════════════════════════════════════════
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ARP
+    # ═══════════════════════════════════════════════════════════════════════════
+
     def _parse_arp(self, packet, r: dict) -> dict:
         arp = packet[ARP]
         op  = 'request' if arp.op == 1 else 'reply'
@@ -83,9 +87,9 @@ class PacketAnalyzer:
         r['dst_mac']  = arp.hwdst
 
         if op == 'request':
-            r['summary'] = f"ARP Request: MAC {arp.hwsrc} pergunta quem tem o IP {arp.pdst}"
+            r['summary'] = f"ARP Request: MAC {arp.hwsrc} (Origem) pergunta pelo dono do IP {arp.pdst}"
         else:
-            r['summary'] = f"ARP Reply: IP {arp.psrc} está no MAC {arp.hwsrc} (Destino: {arp.hwdst})"
+            r['summary'] = f"ARP Reply: MAC {arp.hwsrc} (Origem) responde ao MAC {arp.hwdst} (Destino) dizendo que tem o IP {arp.psrc}"
 
         r['details'] = {
             'operação':    op,
