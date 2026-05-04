@@ -1,15 +1,3 @@
-"""
-Analisador central de protocolos.
-Recebe um pacote Scapy e retorna um dicionário normalizado com:
-  timestamp, interface, protocolo, MACs, IPs, portas, tamanho, resumo, detalhes.
-
-Hierarquia de identificação (do mais específico para o mais geral):
-  Ethernet -> ARP / IPv4
-  IPv4     -> ICMP / TCP / UDP
-  TCP      -> HTTP  (porta 80/8080)
-  UDP      -> DHCP (portas 67-68)
-"""
-
 import time
 from datetime import datetime
 
