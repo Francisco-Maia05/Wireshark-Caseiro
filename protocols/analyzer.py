@@ -37,18 +37,15 @@ class PacketAnalyzer:
             'details':       {},
         }
 
-        # ── Camada 2: Ethernet ────────────────────────────────────────────────
         if packet.haslayer(Ether):
             eth = packet[Ether]
             result['src_mac'] = eth.src
             result['dst_mac'] = eth.dst
             result['protocol'] = 'Ethernet'
 
-        # ── ARP ───────────────────────────────────────────────────────────────
         if packet.haslayer(ARP):
             return self._parse_arp(packet, result)
 
-        # ── IPv4 ──────────────────────────────────────────────────────────────
         if packet.haslayer(IP):
             return self._parse_ipv4(packet, result)
 
@@ -56,13 +53,8 @@ class PacketAnalyzer:
         result['summary'] = f"Ethernet {result['src_mac']} → {result['dst_mac']}"
         return result
 
-    # ═══════════════════════════════════════════════════════════════════════════
+    
     # ARP
-    # ═══════════════════════════════════════════════════════════════════════════
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # ARP
-    # ═══════════════════════════════════════════════════════════════════════════
 
     def _parse_arp(self, packet, r: dict) -> dict:
         arp = packet[ARP]
@@ -88,9 +80,8 @@ class PacketAnalyzer:
         }
         return r
 
-    # ═══════════════════════════════════════════════════════════════════════════
+    
     # IPv4
-    # ═══════════════════════════════════════════════════════════════════════════
 
     def _parse_ipv4(self, packet, r: dict) -> dict:
         ip = packet[IP]
@@ -114,9 +105,8 @@ class PacketAnalyzer:
         r['summary'] = f"IPv4 {ip.src} → {ip.dst}  proto={ip.proto}"
         return r
 
-    # ═══════════════════════════════════════════════════════════════════════════
+
     # ICMP
-    # ═══════════════════════════════════════════════════════════════════════════
 
     ICMP_TYPES = {
         0:  'Echo Reply',
@@ -160,9 +150,8 @@ class PacketAnalyzer:
 
         return r
 
-    # ═══════════════════════════════════════════════════════════════════════════
+    
     # TCP
-    # ═══════════════════════════════════════════════════════════════════════════
 
     def _parse_tcp(self, packet, r: dict) -> dict:
         tcp = packet[TCP]
@@ -209,9 +198,8 @@ class PacketAnalyzer:
         r['summary'] = base + note
         return r
 
-    # ═══════════════════════════════════════════════════════════════════════════
+    
     # UDP
-    # ═══════════════════════════════════════════════════════════════════════════
 
     def _parse_udp(self, packet, r: dict) -> dict:
         udp = packet[UDP]
@@ -234,9 +222,8 @@ class PacketAnalyzer:
         )
         return r
 
-    # ═══════════════════════════════════════════════════════════════════════════
+    
     # DHCP
-    # ═══════════════════════════════════════════════════════════════════════════
 
     DHCP_MSG_TYPES = {
         1: 'Discover', 2: 'Offer',   3: 'Request', 4: 'Decline',
@@ -277,9 +264,8 @@ class PacketAnalyzer:
 
         return r
 
-    # ═══════════════════════════════════════════════════════════════════════════
+    
     # HTTP
-    # ═══════════════════════════════════════════════════════════════════════════
 
     def _parse_http(self, packet, r: dict, tcp, payload: bytes) -> dict:
         r['protocol'] = 'HTTP'
@@ -293,9 +279,8 @@ class PacketAnalyzer:
             )
         return r
 
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Helpers
-    # ═══════════════════════════════════════════════════════════════════════════
+
+    # Flags
 
     @staticmethod
     def _decode_tcp_flags(flags) -> list[str]:
