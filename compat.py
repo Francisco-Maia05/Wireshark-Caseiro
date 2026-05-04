@@ -1,12 +1,5 @@
 """
-Patch de compatibilidade — deve ser o PRIMEIRO import em qualquer ficheiro que use Scapy.
-
-Problema: em alguns ambientes (CORE, containers, Python 3.12) a função
-scapy.utils6.construct_source_candidate_set falha com KeyError: 'scope'
-porque o kernel devolve entradas de endereços IPv6 sem o campo 'scope'.
-Isto propaga-se para scapy.route6 → scapy.layers.inet e bloqueia todos os imports.
-
-Solução: patch da função ANTES de scapy.route6 ser carregado.
+Patch de compatibilidade por causa da versão do core
 """
 
 import sys
