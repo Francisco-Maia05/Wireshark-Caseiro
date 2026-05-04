@@ -6,12 +6,11 @@ from filters import FilterEngine
 
 
 class SnifferEngine:
-    """
-    Orquestra a captura de pacotes.
-    - Usa sniff() do Scapy com filtro BPF opcional.
-    - Aplica filtros de alto nível.
-    - Gere Estado (Interliga Pings e Fragmentos).
-    """
+
+  # - Usa sniff() do Scapy com filtro BPF opcional.
+  # - Aplica filtros de alto nível.
+  # - Gere Estado (Interliga Pings e Fragmentos).
+
 
     def __init__(self, interface, filter_config, display=None, logger=None, count=0):
         self.interface     = interface
@@ -73,7 +72,7 @@ class SnifferEngine:
         if not self.filter_engine.matches(parsed):
             return
 
-        # --- FILTRO EXTRA: Apenas Fragmentados ---
+        # Filtro: Apenas Fragmentados ---
         if self.filter_config.get('fragmented'):
             if 'Fragmento' not in parsed.get('summary', ''):
                 return
