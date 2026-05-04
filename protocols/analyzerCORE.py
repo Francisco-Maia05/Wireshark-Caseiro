@@ -64,10 +64,9 @@ class PacketAnalyzer:
         result['summary'] = "Ethernet {} -> {}".format(result['src_mac'], result['dst_mac'])
         return result
 
-    # ===========================================================================
+  
     # ARP
-    # ===========================================================================
-
+  
     def _parse_arp(self, packet, r):
         arp = packet[ARP]
         op  = 'request' if arp.op == 1 else 'reply'
@@ -92,9 +91,8 @@ class PacketAnalyzer:
         }
         return r
 
-    # ===========================================================================
+  
     # IPv4
-    # ===========================================================================
 
     def _parse_ipv4(self, packet, r):
         ip = packet[IP]
@@ -117,10 +115,9 @@ class PacketAnalyzer:
 
         r['summary'] = "IPv4 {} -> {}  proto={}".format(ip.src, ip.dst, ip.proto)
         return r
+      
 
-    # ===========================================================================
     # ICMP
-    # ===========================================================================
 
     ICMP_TYPES = {
         0:  'Echo Reply',
@@ -165,10 +162,9 @@ class PacketAnalyzer:
 
         return r
 
-    # ===========================================================================
+  
     # TCP
-    # ===========================================================================
-
+  
     def _parse_tcp(self, packet, r):
         tcp = packet[TCP]
         r['protocol'] = 'TCP'
@@ -213,9 +209,9 @@ class PacketAnalyzer:
         r['summary'] = base + note
         return r
 
-    # ===========================================================================
+
+  
     # UDP
-    # ===========================================================================
 
     def _parse_udp(self, packet, r):
         udp = packet[UDP]
@@ -236,9 +232,8 @@ class PacketAnalyzer:
             r['src_ip'], udp.sport, r['dst_ip'], udp.dport, udp.len)
         return r
 
-    # ===========================================================================
+  
     # DHCP
-    # ===========================================================================
 
     DHCP_MSG_TYPES = {
         1: 'Discover', 2: 'Offer',   3: 'Request', 4: 'Decline',
@@ -279,9 +274,8 @@ class PacketAnalyzer:
 
         return r
 
-    # ===========================================================================
+  
     # HTTP
-    # ===========================================================================
 
     def _parse_http(self, packet, r, tcp, payload):
         r['protocol'] = 'HTTP'
@@ -294,10 +288,9 @@ class PacketAnalyzer:
                 r['src_ip'], tcp.sport, r['dst_ip'], tcp.dport)
         return r
 
-    # ===========================================================================
-    # Helpers
-    # ===========================================================================
 
+  #Flags
+  
     @staticmethod
     def _decode_tcp_flags(flags):
         mapping = [
